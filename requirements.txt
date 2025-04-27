@@ -1,0 +1,6 @@
+speechrecognition
+obs-websocket-py
+pyttsx3
+requests
+PyQt5
+pyaudio
