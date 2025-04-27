@@ -6,12 +6,12 @@ from modules.config import load_config
 def main():
     config = load_config()
 
-    print(f"🎙️ StreamMind Pilot iniciado. Escuchando activación: '{config['wake_word']}'...")
+    print(f"🎙️ StreamMind Pilot started. Listening for wake word: '{config['wake_word']}'...")
 
     while True:
         command_text = listen_for_command()
         if command_text:
-            print(f"🔎 Comando después del wake word: {command_text}")
+            print(f"🔎 Command after wake word: {command_text}")
             action = interpret_command(command_text)
             if action:
                 execute_action(action, config)

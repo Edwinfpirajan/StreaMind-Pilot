@@ -1,23 +1,35 @@
 import speech_recognition as sr
+from modules.config import load_config
+
+config = load_config()
 
 def listen_for_command():
+    """Capture voice input and process it based on the wake word."""
     recognizer = sr.Recognizer()
 
     with sr.Microphone() as source:
-        print("🎙️ Escuchando tu voz... (habla ahora)")
-        recognizer.adjust_for_ambient_noise(source)  # Calibrar ruido ambiente
+        print(f"🎙️ Listening... (Language: {config['language']}, Wake word: '{config['wake_word']}')")
+        recognizer.adjust_for_ambient_noise(source)
 
         try:
-            audio = recognizer.listen(source, timeout=5, phrase_time_limit=8)
-            command = recognizer.recognize_google(audio, language="es-ES")
-            print(f"🔎 Capturado: {command}")
-            return command.lower()
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=10)
+            command = recognizer.recognize_google(audio, language=config['language'])
+            command = command.lower()
+            print(f"🔎 Captured: {command}")
+
+            if config['wake_word'] in command:
+                cleaned_command = command.replace(config['wake_word'], '', 1).strip()
+                return cleaned_command
+            else:
+                print("🙈 Wake word not detected.")
+                return None
+
         except sr.WaitTimeoutError:
-            print("⌛ Tiempo de espera agotado, no se detectó voz.")
+            print("⌛ Timeout reached, no voice detected.")
             return None
         except sr.UnknownValueError:
-            print("❓ No se pudo entender el audio.")
+            print("❓ Could not understand the audio.")
             return None
         except sr.RequestError as e:
-            print(f"❌ Error con el servicio de reconocimiento de voz: {e}")
+            print(f"❌ Voice recognition service error: {e}")
             return None

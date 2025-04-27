@@ -1,54 +1,109 @@
+import os
+import subprocess
+import pygame
 import requests
-import pyttsx3
 from modules.config import load_config
 
+# Load configuration
 config = load_config()
 
-# Configurar pyttsx3 para hablar
-engine = pyttsx3.init('sapi5')
-engine.setProperty('rate', 160)
-engine.setProperty('volume', 1)
+import os
+import subprocess
 
-def hablar(texto):
-    engine.say(texto)
-    engine.runAndWait()
+import simpleaudio as sa
 
-def interpret_command(text):
+def speak(text):
+    """Genera y reproduce el habla usando Piper (a través de piper.exe subprocess)."""
+    piper_exe_path = os.path.join(os.getcwd(), "piper", "piper.exe")  # Ruta al ejecutable de Piper
+    model_path = os.path.join(os.getcwd(), "models", "es_MX-ald-medium.onnx")  # Modelo correcto
+    output_path = os.path.join(os.getcwd(), "output.wav")
+
+    # Si el archivo de salida existe, lo eliminamos
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
+    # Comando para ejecutar Piper con el modelo y texto
+    command = [
+        piper_exe_path,
+        "--model", model_path,
+        "--output_file", output_path,
+        "--text", text,
+        "--length_scale", "1.1"  # Opcional, ajusta la velocidad del habla
+    ]
+
+    try:
+        print("Running Piper...")
+        # Ejecutamos Piper usando subprocess y capturamos la salida
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+
+        print("Piper finished, output:")
+        print(result.stdout)  # Muestra la salida estándar
+        print(result.stderr)  # Muestra cualquier error
+
+        # Verificamos si el archivo output.wav fue creado
+        if os.path.exists(output_path):
+            print(f"🎤 Archivo generado correctamente: {output_path}")
+            pygame.mixer.init()
+            pygame.mixer.music.load(output_path)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():  # Espera hasta que termine de reproducir
+                pygame.time.Clock().tick(10)
+            print("🎶 Reproducción completada.")
+        else:
+            print("❌ Piper no generó output.wav.")
+    except Exception as e:
+        print(f"❌ Error al ejecutar Piper: {e}")
+
+
+def ask_ollama(prompt):
+    """Envía un prompt a la instancia local de Ollama y obtiene una respuesta."""
+    model = config.get('model', 'phi3')
     url = "http://localhost:11434/api/generate"
-
     payload = {
-        "model": config["model_name"],  # 👈 Aquí leemos desde config.json
-        "prompt": f"Actúa como un asistente de streaming llamado Nova. El usuario dijo: '{text}'. ¿Qué intención detectas? Responde SOLO en una palabra: save_replay, start_recording, stop_recording, change_scene, ban_user, mute_chat, saludo",
+        "model": model,
+        "prompt": prompt,
         "stream": False
     }
 
     try:
-        response = requests.post(url, json=payload)
+        # Realiza la solicitud POST a Ollama
+        response = requests.post(url, json=payload, timeout=30)
+        response.raise_for_status()
         data = response.json()
-
-        ia_response = data.get("response", "").strip().lower()
-        print(f"🤖 IA interpretó como intención: {ia_response}")
-
-        if ia_response == "saludo":
-            hablar("Hola, soy Nova. Lista para ayudarte en tu stream.")
-        elif ia_response == "save_replay":
-            hablar("Guardando el último clip.")
-        elif ia_response == "start_recording":
-            hablar("Iniciando grabación.")
-        elif ia_response == "stop_recording":
-            hablar("Deteniendo grabación.")
-        elif ia_response == "change_scene":
-            hablar("Cambiando de escena.")
-        elif ia_response == "ban_user":
-            hablar("Procediendo a banear al usuario.")
-        elif ia_response == "mute_chat":
-            hablar("Silenciando el chat.")
-        else:
-            hablar("No entendí el comando, ¿puedes repetirlo?")
-
-        return ia_response
-
+        return data.get("response", "").strip().lower()
     except Exception as e:
-        print(f"❌ Error al conectar con OLLAMA: {e}")
-        hablar("Hubo un error conectando a mi cerebro.")
+        print(f"❌ Error al conectar con Ollama: {e}")
+        return ""
+
+def interpret_command(text):
+    """Interpreta el comando del usuario utilizando la respuesta de IA."""
+    intent = ask_ollama(text)
+
+    if not intent:
+        speak("No entendí, ¿puedes repetirlo?")
+        return None
+
+    if "grabar" in intent:
+        speak("Iniciando grabación.")
+        return "start_recording"
+    elif "clip" in intent or "guardar" in intent:
+        speak("Guardando el último clip.")
+        return "save_replay"
+    elif "escena" in intent or "cambiar" in intent:
+        speak("Cambiando de escena.")
+        return "change_scene"
+    elif "detener" in intent or "parar" in intent:
+        speak("Deteniendo la grabación.")
+        return "stop_recording"
+    elif "mutear" in intent or "silenciar" in intent:
+        speak("Silenciando el chat.")
+        return "mute_chat"
+    elif "banear" in intent or "expulsar" in intent:
+        speak("Expulsando al usuario.")
+        return "ban_user"
+    elif "saludo" in intent or "saludar" in intent:
+        speak(f"Hola, soy {config.get('wake_word', 'Nova')}. ¿Cómo puedo ayudarte hoy?")
+        return "saludo"
+    else:
+        speak("No entendí el comando, ¿puedes repetirlo?")
         return None
