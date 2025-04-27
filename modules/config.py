@@ -13,5 +13,7 @@ def load_config():
         return {
             "obs_host": "localhost",
             "obs_port": 4455,
-            "obs_password": "tu_contraseña",
+            "obs_password": "jarvisjunior",
+            "language": "es-ES",
+            "wake_word": "nova"
         }
