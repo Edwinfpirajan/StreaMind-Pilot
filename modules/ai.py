@@ -43,12 +43,22 @@ def listen_for_command():
             return None
 
 def ask_ollama(prompt):
-    """Envía un mensaje a la instancia local de Ollama y obtiene la respuesta."""
-    model = config.get('model', 'phi3')
+    """Envía un mensaje a la instancia local de Ollama con un contexto específico para streaming."""
+    model = config.get('model_name', 'phi3')
     url = "http://localhost:11434/api/generate"
+    
+    system_instruction = (
+        "Eres una asistente de streaming. Tu trabajo es interpretar comandos de voz que controlan OBS Studio. "
+        "Reconoces intenciones como: iniciar grabación, guardar clip, detener grabación, cambiar de escena, mutear audio, banear usuarios, y dar saludos. "
+        "Debes responder únicamente la intención como un verbo simple o frase corta (ej: 'iniciar grabación', 'guardar clip', 'detener grabación'). "
+        "No des respuestas largas, no saludes, no expliques."
+    )
+
+    full_prompt = f"{system_instruction}\n\nUsuario dice: {prompt}\nRespuesta:"
+
     payload = {
         "model": model,
-        "prompt": prompt,
+        "prompt": full_prompt,
         "stream": False
     }
 
@@ -62,37 +72,28 @@ def ask_ollama(prompt):
         print(f"❌ Error connecting to Ollama: {e}")
         return ""
 
+
 def interpret_command(text):
     """Interpreta el comando del usuario y decide la acción a tomar."""
-    print(f"🔎 Command received: {text}")  # Log para verificar que el comando fue recibido correctamente
+    print(f"🔎 Command received: {text}")
     intent = ask_ollama(text)
-    print(f"🔍 Interpreted intent: {intent}")  # Log para verificar la interpretación del comando
+    print(f"🔍 Interpreted intent: {intent}")
 
     if not intent:
         speak("No entendí, ¿puedes repetirlo?")
         return None
 
-    if "grabar" in intent:
+    intent = intent.lower()
+
+    if "iniciar grabación" in intent or "empezar a grabar" in intent or "grabar" in intent:
         speak("Iniciando grabación.")
         return "start_recording"
-    elif "clip" in intent or "guardar" in intent:
+    elif "guardar clip" in intent or "guardar replay" in intent or "guardar" in intent:
         speak("Guardando el último clip.")
         return "save_replay"
-    elif "escena" in intent or "cambiar" in intent:
-        speak("Cambiando de escena.")
-        return "change_scene"
-    elif "detener" in intent or "parar" in intent:
+    elif "detener grabación" in intent or "parar grabación" in intent or "detener" in intent:
         speak("Deteniendo la grabación.")
         return "stop_recording"
-    elif "mutear" in intent or "silenciar" in intent:
-        speak("Silenciando el chat.")
-        return "mute_chat"
-    elif "banear" in intent or "expulsar" in intent:
-        speak("Expulsando al usuario.")
-        return "ban_user"
-    elif "saludo" in intent or "saludar" in intent:
-        speak(f"Hola, soy {config.get('wake_word', 'Nova')}. ¿Cómo puedo ayudarte hoy?")
-        return "saludo"
     else:
         speak(intent)
         return None
