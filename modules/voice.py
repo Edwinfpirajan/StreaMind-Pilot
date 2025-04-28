@@ -12,7 +12,7 @@ def listen_for_command():
         recognizer.adjust_for_ambient_noise(source)
 
         try:
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=25)
             command = recognizer.recognize_google(audio, language=config['language'])
             command = command.lower()
             print(f"🔎 Captured: {command}")

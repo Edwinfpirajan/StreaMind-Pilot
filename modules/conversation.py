@@ -2,9 +2,10 @@
 
 from modules.voice import listen_for_command
 from modules.speak import speak
+from modules.ai import chat_with_ollama
 
 def conversation_mode():
-    """Modo conversación amigable con Ana cuando no entiende un comando."""
+    """Modo conversación real con Ana usando Ollama."""
     speak("No entendí tu orden. ¿Quieres conversar un momento? Puedes decir 'ok Ana' para finalizar.")
 
     while True:
@@ -12,18 +13,16 @@ def conversation_mode():
         if not command_text:
             continue
 
-        command_text = command_text.lower()
+        command_text = command_text.lower().strip()
 
-        if "ok ana" in command_text or "gracias ana" in command_text or "listo ana" in command_text:
+        # ✅ Detectar si quieres finalizar la conversación
+        if any(phrase in command_text for phrase in ["ok ana", "gracias ana", "finalizar ana", "listo ana"]):
             speak("Perfecto, volvamos a las órdenes principales.")
             break
+
+        # ✨ Pedimos respuesta real a Ollama
+        response = chat_with_ollama(command_text)
+        if response:
+            speak(response)
         else:
-            responses = [
-                "Claro, te escucho.",
-                "Cuéntame más.",
-                "¿Qué más quieres decirme?",
-                "Estoy aquí para ayudarte.",
-                "Te sigo escuchando."
-            ]
-            import random
-            speak(random.choice(responses))
+            speak("Estoy aquí para escucharte.")
