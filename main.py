@@ -1,8 +1,8 @@
 from modules.voice import listen_for_command
-from modules.ai import interpret_command
+from modules.ai import interpret_command, respond_after_action
 from modules.obs_control import execute_action
-from modules.conversation import conversation_mode
 from modules.config import load_config
+from modules.conversation import conversation_mode
 
 def main():
     config = load_config()
@@ -17,6 +17,7 @@ def main():
 
             if action:
                 execute_action(action, config)
+                respond_after_action(action)  # ✅ Después de ejecutar, ahora responde
             else:
                 conversation_mode()
 

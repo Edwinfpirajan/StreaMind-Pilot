@@ -1,6 +1,8 @@
+# modules/ai.py
+
 from modules.config import load_config
-import requests
 from modules.speak import speak
+import requests
 
 # Configuración cargada
 config = load_config()
@@ -14,7 +16,7 @@ ALLOWED_COMMANDS = [
     "save_replay"
 ]
 
-# 🧠 Función para hablar después de ejecutar algo
+# 🧠 Función para hablar después de ejecutar una acción
 def respond_after_action(command):
     responses = {
         "start_recording": "¡Grabación iniciada!",
@@ -23,12 +25,11 @@ def respond_after_action(command):
         "stop_streaming": "Transmisión finalizada.",
         "save_replay": "Clip guardado exitosamente."
     }
-
     response = responses.get(command, "Acción completada.")
     print(f"🗣️ {response}")
     speak(response)
 
-# ✨ Pedir a Ollama interpretación directa de comandos
+# ✨ Pedir interpretación a Ollama
 def ask_ollama(prompt):
     model = config.get('model', 'phi3')
     url = "http://localhost:11434/api/generate"
@@ -36,17 +37,16 @@ def ask_ollama(prompt):
         "model": model,
         "prompt": f"""
 Eres un asistente de control de OBS Studio.
-Tu única función es responder únicamente uno de estos comandos EXACTOS:
-- start_recording
-- stop_recording
-- start_streaming
-- stop_streaming
-- save_replay
+Solo debes responder UNO de estos comandos exactos:
+- start_recording (cuando digan grabar, iniciar grabación, comenzar grabación)
+- stop_recording (cuando digan detener grabación, parar grabación)
+- start_streaming (cuando digan transmitir, iniciar en vivo, empezar en vivo)
+- stop_streaming (cuando digan detener transmisión, parar transmisión)
+- save_replay (cuando digan haz un clip, guardar clip, hace un clip, guardar repetición)
 
-No respondas frases ni explicaciones.
-Si no puedes interpretar el comando, responde exactamente: none
+Si el mensaje del usuario no corresponde, responde solo: none
 
-El usuario dice: "{prompt}"
+Usuario dice: "{prompt}"
 """,
         "stream": False
     }
@@ -62,9 +62,8 @@ El usuario dice: "{prompt}"
         print(f"❌ Error connecting to Ollama: {e}")
         return "none"
 
-# ✨ Interpretar y responder
+# ✨ Interpretar y validar
 def interpret_command(text):
-    """Interpreta texto y ejecuta acción + respuesta hablada."""
     command = ask_ollama(text)
 
     if command in ALLOWED_COMMANDS:
