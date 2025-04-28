@@ -1,3 +1,4 @@
+import time
 from obsws_python import ReqClient
 
 # Global OBS client
@@ -49,16 +50,29 @@ def is_replay_buffer_active():
 
 def start_replay_buffer_if_needed():
     """Start replay buffer if it's not already active."""
+    global obs_client
     if not is_replay_buffer_active():
-        obs_client.start_replay_buffer()
-        print("📼 Replay Buffer started.")
+        try:
+            obs_client.start_replay_buffer()
+            print("📼 Replay Buffer started.")
+        except Exception as e:
+            print(f"❌ Error starting Replay Buffer: {e}")
 
 def stop_replay_buffer_if_needed():
     """Stop replay buffer if no recording or streaming is active."""
+    global obs_client
+    time.sleep(1)  # Esperar un momento para que OBS actualice estado real
     if not is_recording() and not is_streaming():
         if is_replay_buffer_active():
-            obs_client.stop_replay_buffer()
-            print("🛑 Replay Buffer stopped.")
+            try:
+                obs_client.stop_replay_buffer()
+                print("🛑 Replay Buffer stopped because no recording or streaming are active.")
+            except Exception as e:
+                print(f"❌ Error stopping Replay Buffer: {e}")
+        else:
+            print("ℹ️ Replay Buffer was already stopped.")
+    else:
+        print("ℹ️ Replay Buffer remains active because recording or streaming is still ongoing.")
 
 def execute_action(action, config):
     """Execute an action in OBS based on the interpreted AI intention."""
@@ -91,24 +105,43 @@ def execute_action(action, config):
             start_replay_buffer_if_needed()
 
         elif action == "stop_recording":
-            if not is_recording():
-                print("⚠️ No active recording to stop.")
-            else:
+            try:
                 obs_client.stop_record()
-                print("⏹️ Recording stopped in OBS.")
+                print("⏹️ Recording stop requested to OBS.")
+            except Exception as e:
+                print(f"❌ Error stopping recording: {e}")
+
+            time.sleep(1)
+
+            if not is_recording():
+                print("✅ Recording successfully stopped.")
+            else:
+                print("⚠️ Warning: Recording still appears active.")
+
             stop_replay_buffer_if_needed()
 
         elif action == "stop_streaming":
-            if not is_streaming():
-                print("⚠️ No active stream to stop.")
-            else:
+            try:
                 obs_client.stop_stream()
-                print("🛑 Streaming stopped in OBS.")
+                print("🛑 Streaming stop requested to OBS.")
+            except Exception as e:
+                print(f"❌ Error stopping streaming: {e}")
+
+            time.sleep(1)
+
+            if not is_streaming():
+                print("✅ Streaming successfully stopped.")
+            else:
+                print("⚠️ Warning: Streaming still appears active.")
+
             stop_replay_buffer_if_needed()
 
         elif action == "save_replay":
-            obs_client.save_replay_buffer()
-            print("🎬 Replay buffer saved.")
+            try:
+                obs_client.save_replay_buffer()
+                print("🎬 Replay buffer saved.")
+            except Exception as e:
+                print(f"❌ Error saving replay buffer: {e}")
 
         else:
             print(f"⚠️ Action not recognized in OBS: {action}")

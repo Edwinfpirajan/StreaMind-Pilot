@@ -4,7 +4,7 @@
     "obs_password": "123456",
     "language": "es-ES",
     "wake_word": "ana",
-    "assistant_name": "Ana",
+    "assistant_name": "Nova",
     "voice_model": "es_MX-claude-high.onnx",
     "model": "phi3"
 }

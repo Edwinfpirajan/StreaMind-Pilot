@@ -1,64 +1,53 @@
-import os
-import time
-import pygame
-import pyttsx3
-import requests
-import speech_recognition as sr
 from modules.config import load_config
+import requests
+from modules.speak import speak
 
-# Cargar configuración
+# Configuración cargada
 config = load_config()
 
-# Inicializar el motor de voz
-engine = pyttsx3.init()
-engine.setProperty('rate', 150)  # Ajusta la velocidad del habla (puedes cambiarla)
-engine.setProperty('volume', 1)  # Ajusta el volumen (de 0.0 a 1.0)
+# Lista de comandos válidos
+ALLOWED_COMMANDS = [
+    "start_recording",
+    "stop_recording",
+    "start_streaming",
+    "stop_streaming",
+    "save_replay"
+]
 
-def speak(text):
-    """Genera y reproduce el habla usando pyttsx3."""
-    engine.say(text)
-    engine.runAndWait()
+# 🧠 Función para hablar después de ejecutar algo
+def respond_after_action(command):
+    responses = {
+        "start_recording": "¡Grabación iniciada!",
+        "stop_recording": "Grabación detenida.",
+        "start_streaming": "¡Estamos en vivo!",
+        "stop_streaming": "Transmisión finalizada.",
+        "save_replay": "Clip guardado exitosamente."
+    }
 
-def listen_for_command():
-    """Escucha el comando después de detectar el wake word."""
-    recognizer = sr.Recognizer()
+    response = responses.get(command, "Acción completada.")
+    print(f"🗣️ {response}")
+    speak(response)
 
-    with sr.Microphone() as source:
-        print("🎙️ Listening for wake word...")
-        recognizer.adjust_for_ambient_noise(source)
-        
-        try:
-            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)  # Ajustamos el timeout y el límite de la frase
-            command = recognizer.recognize_google(audio, language=config['language'])
-            print(f"🔎 Command captured: {command}")
-            return command.lower()
-        except sr.WaitTimeoutError:
-            print("⌛ Timeout reached, no voice detected.")
-            return None
-        except sr.UnknownValueError:
-            print("❌ Could not understand the audio.")
-            return None
-        except sr.RequestError as e:
-            print(f"❌ Error with Google Speech Recognition service: {e}")
-            return None
-
+# ✨ Pedir a Ollama interpretación directa de comandos
 def ask_ollama(prompt):
-    """Envía un mensaje a la instancia local de Ollama con un contexto específico para streaming."""
-    model = config.get('model_name', 'phi3')
+    model = config.get('model', 'phi3')
     url = "http://localhost:11434/api/generate"
-    
-    system_instruction = (
-        "Eres una asistente de streaming. Tu trabajo es interpretar comandos de voz que controlan OBS Studio. "
-        "Reconoces intenciones como: iniciar grabación, guardar clip, detener grabación, cambiar de escena, mutear audio, banear usuarios, y dar saludos. "
-        "Debes responder únicamente la intención como un verbo simple o frase corta (ej: 'iniciar grabación', 'guardar clip', 'detener grabación'). "
-        "No des respuestas largas, no saludes, no expliques."
-    )
-
-    full_prompt = f"{system_instruction}\n\nUsuario dice: {prompt}\nRespuesta:"
-
     payload = {
         "model": model,
-        "prompt": full_prompt,
+        "prompt": f"""
+Eres un asistente de control de OBS Studio.
+Tu única función es responder únicamente uno de estos comandos EXACTOS:
+- start_recording
+- stop_recording
+- start_streaming
+- stop_streaming
+- save_replay
+
+No respondas frases ni explicaciones.
+Si no puedes interpretar el comando, responde exactamente: none
+
+El usuario dice: "{prompt}"
+""",
         "stream": False
     }
 
@@ -66,34 +55,25 @@ def ask_ollama(prompt):
         response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
-        print(data)
-        return data.get("response", "").strip().lower()
+        intent = data.get("response", "").strip().lower()
+        print(f"🧠 IA Respondió: {intent}")
+        return intent
     except Exception as e:
         print(f"❌ Error connecting to Ollama: {e}")
-        return ""
+        return "none"
 
-
+# ✨ Interpretar y responder
 def interpret_command(text):
-    """Interpreta el comando del usuario y decide la acción a tomar."""
-    print(f"🔎 Command received: {text}")
-    intent = ask_ollama(text)
-    print(f"🔍 Interpreted intent: {intent}")
+    """Interpreta texto y ejecuta acción + respuesta hablada."""
+    command = ask_ollama(text)
 
-    if not intent:
-        speak("No entendí, ¿puedes repetirlo?")
+    if command in ALLOWED_COMMANDS:
+        return command
+    elif command == "none":
+        print("⚠️ IA no pudo interpretar un comando válido.")
+        speak("No entendí tu orden. ¿Podrías repetirla?")
         return None
-
-    intent = intent.lower()
-
-    if "iniciar grabación" in intent or "empezar a grabar" in intent or "grabar" in intent:
-        speak("Iniciando grabación.")
-        return "start_recording"
-    elif "guardar clip" in intent or "guardar replay" in intent or "guardar" in intent:
-        speak("Guardando el último clip.")
-        return "save_replay"
-    elif "detener grabación" in intent or "parar grabación" in intent or "detener" in intent:
-        speak("Deteniendo la grabación.")
-        return "stop_recording"
     else:
-        speak(intent)
+        print(f"⚠️ Comando recibido no permitido: {command}")
+        speak("Orden no reconocida.")
         return None
