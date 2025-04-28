@@ -1,62 +1,49 @@
 import os
-import subprocess
+import time
 import pygame
+import pyttsx3
 import requests
+import speech_recognition as sr
 from modules.config import load_config
 
-# Load configuration
+# Cargar configuración
 config = load_config()
 
-import os
-import subprocess
-
-import simpleaudio as sa
+# Inicializar el motor de voz
+engine = pyttsx3.init()
+engine.setProperty('rate', 150)  # Ajusta la velocidad del habla (puedes cambiarla)
+engine.setProperty('volume', 1)  # Ajusta el volumen (de 0.0 a 1.0)
 
 def speak(text):
-    """Genera y reproduce el habla usando Piper (a través de piper.exe subprocess)."""
-    piper_exe_path = os.path.join(os.getcwd(), "piper", "piper.exe")  # Ruta al ejecutable de Piper
-    model_path = os.path.join(os.getcwd(), "models", "es_MX-ald-medium.onnx")  # Modelo correcto
-    output_path = os.path.join(os.getcwd(), "output.wav")
+    """Genera y reproduce el habla usando pyttsx3."""
+    engine.say(text)
+    engine.runAndWait()
 
-    # Si el archivo de salida existe, lo eliminamos
-    if os.path.exists(output_path):
-        os.remove(output_path)
+def listen_for_command():
+    """Escucha el comando después de detectar el wake word."""
+    recognizer = sr.Recognizer()
 
-    # Comando para ejecutar Piper con el modelo y texto
-    command = [
-        piper_exe_path,
-        "--model", model_path,
-        "--output_file", output_path,
-        "--text", text,
-        "--length_scale", "1.1"  # Opcional, ajusta la velocidad del habla
-    ]
-
-    try:
-        print("Running Piper...")
-        # Ejecutamos Piper usando subprocess y capturamos la salida
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-
-        print("Piper finished, output:")
-        print(result.stdout)  # Muestra la salida estándar
-        print(result.stderr)  # Muestra cualquier error
-
-        # Verificamos si el archivo output.wav fue creado
-        if os.path.exists(output_path):
-            print(f"🎤 Archivo generado correctamente: {output_path}")
-            pygame.mixer.init()
-            pygame.mixer.music.load(output_path)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():  # Espera hasta que termine de reproducir
-                pygame.time.Clock().tick(10)
-            print("🎶 Reproducción completada.")
-        else:
-            print("❌ Piper no generó output.wav.")
-    except Exception as e:
-        print(f"❌ Error al ejecutar Piper: {e}")
-
+    with sr.Microphone() as source:
+        print("🎙️ Listening for wake word...")
+        recognizer.adjust_for_ambient_noise(source)
+        
+        try:
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)  # Ajustamos el timeout y el límite de la frase
+            command = recognizer.recognize_google(audio, language=config['language'])
+            print(f"🔎 Command captured: {command}")
+            return command.lower()
+        except sr.WaitTimeoutError:
+            print("⌛ Timeout reached, no voice detected.")
+            return None
+        except sr.UnknownValueError:
+            print("❌ Could not understand the audio.")
+            return None
+        except sr.RequestError as e:
+            print(f"❌ Error with Google Speech Recognition service: {e}")
+            return None
 
 def ask_ollama(prompt):
-    """Envía un prompt a la instancia local de Ollama y obtiene una respuesta."""
+    """Envía un mensaje a la instancia local de Ollama y obtiene la respuesta."""
     model = config.get('model', 'phi3')
     url = "http://localhost:11434/api/generate"
     payload = {
@@ -66,18 +53,20 @@ def ask_ollama(prompt):
     }
 
     try:
-        # Realiza la solicitud POST a Ollama
         response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
+        print(data)
         return data.get("response", "").strip().lower()
     except Exception as e:
-        print(f"❌ Error al conectar con Ollama: {e}")
+        print(f"❌ Error connecting to Ollama: {e}")
         return ""
 
 def interpret_command(text):
-    """Interpreta el comando del usuario utilizando la respuesta de IA."""
+    """Interpreta el comando del usuario y decide la acción a tomar."""
+    print(f"🔎 Command received: {text}")  # Log para verificar que el comando fue recibido correctamente
     intent = ask_ollama(text)
+    print(f"🔍 Interpreted intent: {intent}")  # Log para verificar la interpretación del comando
 
     if not intent:
         speak("No entendí, ¿puedes repetirlo?")
@@ -105,5 +94,5 @@ def interpret_command(text):
         speak(f"Hola, soy {config.get('wake_word', 'Nova')}. ¿Cómo puedo ayudarte hoy?")
         return "saludo"
     else:
-        speak("No entendí el comando, ¿puedes repetirlo?")
+        speak(intent)
         return None

@@ -1,10 +1,10 @@
 {
-  "obs_host": "localhost",
-  "obs_port": 4455,
-  "obs_password": "123456",
-  "language": "es-ES",
-  "wake_word": "ana",
-  "assistant_name": "Ana",
-  "voice_model": "es_MX-claude-high.onnx",
-  "model": "phi3"
+    "obs_host": "localhost",
+    "obs_port": 4455,
+    "obs_password": "123456",
+    "language": "es-ES",
+    "wake_word": "ana",
+    "assistant_name": "Ana",
+    "voice_model": "es_MX-claude-high.onnx",
+    "model": "phi3"
 }
